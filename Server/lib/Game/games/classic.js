@@ -20,12 +20,13 @@ var Const = require('../../const');
 var Lizard = require('../../sub/lizard');
 var DB;
 var DIC;
+var freeAble = false;
 
 const ROBOT_START_DELAY = [ 1200, 800, 400, 200, 0 ];
 const ROBOT_TYPE_COEF = [ 1250, 750, 500, 250, 0 ];
 const ROBOT_THINK_COEF = [ 4, 2, 1, 0, 0 ];
-const ROBOT_HIT_LIMIT = [ 8, 4, 2, 1, 0 ];
-const ROBOT_LENGTH_LIMIT = [ 3, 4, 9, 99, 99 ];
+const ROBOT_HIT_LIMIT = [ 4, 2, 0, 0, 0 ];
+const ROBOT_LENGTH_LIMIT = [ 3, 4, 9, 99, 100 ];
 const RIEUL_TO_NIEUN = [4449, 4450, 4457, 4460, 4462, 4467];
 const RIEUL_TO_IEUNG = [4451, 4455, 4456, 4461, 4466, 4469];
 const NIEUN_TO_IEUNG = [4455, 4461, 4466, 4469];
@@ -54,16 +55,26 @@ exports.getTitle = function(){
 	
 	switch(Const.GAME_TYPE[my.mode]){
 		case 'EKT':
+			freeAble = false;
 		case 'ESH':
+			freeAble = false;
 			eng = "^" + String.fromCharCode(97 + Math.floor(Math.random() * 26));
 			break;
+		case 'KJH':
+			freeAble = true;
+			ja = 44032 + 588 * Math.floor(Math.random() * 18);
+			eng = "^[\\u" + ja.toString(16) + "-\\u" + (ja + 587).toString(16) + "]";
+			break;
 		case 'KKT':
+			freeAble = false;
 			my.game.wordLength = 3;
 		case 'KSH':
+			freeAble = false;
 			ja = 44032 + 588 * Math.floor(Math.random() * 18);
 			eng = "^[\\u" + ja.toString(16) + "-\\u" + (ja + 587).toString(16) + "]";
 			break;
 		case 'KAP':
+			freeAble = false;
 			ja = 44032 + 588 * Math.floor(Math.random() * 18);
 			eng = "[\\u" + ja.toString(16) + "-\\u" + (ja + 587).toString(16) + "]$";
 			break;
@@ -73,6 +84,7 @@ exports.getTitle = function(){
 			R.go(EXAMPLE);
 			return;
 		}
+
 		DB.kkutu[l.lang].find(
 			[ '_id', new RegExp(eng + ".{" + Math.max(1, my.round - 1) + "}$") ],
 			// [ 'hit', { '$lte': h } ],
@@ -130,11 +142,26 @@ exports.roundReady = function(){
 	my.game.round++;
 	my.game.roundTime = my.time * 1000;
 	if(my.game.round <= my.round){
+        let isFirstRound = my.game.round == 1;
 		my.game.char = my.game.title[my.game.round - 1];
 		my.game.subChar = getSubChar.call(my, my.game.char);
 		my.game.chain = [];
 		if(my.opts.mission) my.game.mission = getMission(my.rule.lang);
 		if(my.opts.sami) my.game.wordLength = 2;
+		if (my.opts.item) {
+            if (isFirstRound) {
+                my.game.item = {};
+                my.game.used = {};
+                my.game.rev = false;
+                my.game.ilock = false;
+            }
+            for (o of my.game.seq) {
+                let t = o.robot ? o.id : o;
+                my.game.item[t] = [0, 0, 0, 0, 0];
+                my.game.used[t] = 0;
+                my.game.ilock = false;
+            }
+        }
 		
 		my.byMaster('roundReady', {
 			round: my.game.round,
@@ -212,14 +239,16 @@ exports.submit = function(client, text){
 	var my = this;
 	var tv = (new Date()).getTime();
 	var mgt = my.game.seq[my.game.turn];
-	
+	var returnNuff = false;
+
 	if(!mgt) return;
 	if(!mgt.robot) if(mgt != client.id) return;
 	if(!my.game.char) return;
 	
 	if(!isChainable(text, my.mode, my.game.char, my.game.subChar)) return client.chat(text);
-	if(my.game.chain.indexOf(text) != -1) return client.publish('turnError', { code: 409, value: text }, true);
-	
+	if(my.game.chain.indexOf(text) != -1 && !my.opts.reuse) return client.publish('turnError', { code: 409, value: text }, true);
+	if(my.game.chain.indexOf(text) != -1 && my.opts.reuse) returnNuff = true;
+
 	l = my.rule.lang;
 	my.game.loading = true;
 	function onDB($doc){
@@ -238,13 +267,14 @@ exports.submit = function(client, text){
 				my.game.late = true;
 				clearTimeout(my.game.turnTimer);
 				t = tv - my.game.turnAt;
-				score = my.getScore(text, t);
+				score = (returnNuff) ? 0 : my.getScore(text, t, false, returnNuff);
 				my.game.dic[text] = (my.game.dic[text] || 0) + 1;
 				my.game.chain.push(text);
 				my.game.roundTime -= t;
 				my.game.char = preChar;
 				my.game.subChar = preSubChar;
 				client.game.score += score;
+				if(!freeAble){
 				client.publish('turnEnd', {
 					ok: true,
 					value: text,
@@ -255,16 +285,30 @@ exports.submit = function(client, text){
                     bonus: (my.game.mission === true) ? score - my.getScore(text, t, true, returnNuff) : 0,
                     baby: $doc ? $doc.baby : null
 				}, true);
+			}
+			else{
+				client.publish('turnEnd', {
+					ok: true,
+					value: text,
+					mean: "",
+					theme: "",
+					wc: "",
+					score: score,
+					bonus: (my.game.mission === true) ? score - my.getScore(text, t, true, returnNuff) : 0,
+					baby: ""
+				}, true);
+			}
 				if(my.game.mission === true){
 					my.game.mission = getMission(my.rule.lang);
 				}
 				setTimeout(my.turnNext, my.game.turnTime / 6);
 				if(!client.robot){
 					client.invokeWordPiece(text, 1);
-					DB.kkutu[l].update([ '_id', text ]).set([ 'hit', $doc.hit + 1 ]).on();
+					try{DB.kkutu[l].update([ '_id', text ]).set([ 'hit', $doc.hit + 1 ]).on()}
+                    catch(a){}
 				}
 			}
-			if(firstMove || my.opts.manner) getAuto.call(my, preChar, preSubChar, 1).then(function(w){
+			if(!my.opts.unknownword && firstMove || my.opts.manner) getAuto.call(my, preChar, preSubChar, 1).then(function(w){
 				if(w) approved();
 				else{
 					my.game.loading = false;
@@ -280,7 +324,21 @@ exports.submit = function(client, text){
 			my.game.loading = false;
 			client.publish('turnError', { code: code || 404, value: text }, true);
 		}
-		if($doc){
+
+		function check_word(word){
+            return word.match(/^[ \-\_0-9A-Za-zぁ-ヾㄱ-ㅣ가-힣]*$/)
+        }
+
+		if(freeAble){
+			var kkutuAble = /^[0-9가-힣ㄱ-ㅎㅏ-ㅣ]*$/;
+			if(kkutuAble.test(text)){
+				preApproved();
+			}
+			else{
+				denied(408);
+			}
+		}
+		else if($doc){
 			if(my.opts.unknownword) denied(414);
 			else if(!my.opts.injeong && ($doc.flag & Const.KOR_FLAG.INJEONG)) denied();
 			else if(my.opts.nooij && $doc.theme.indexOf("OIJ") != -1) denied(412);
@@ -292,7 +350,6 @@ exports.submit = function(client, text){
                 if (check_word(text)) preApproved();
                 else denied(413);
             }
-			
 			denied();
 		}
 	}
@@ -316,7 +373,84 @@ exports.submit = function(client, text){
 		(l == "ko") ? [ 'type', Const.KOR_GROUP ] : [ '_id', Const.ENG_ID ]
 	).on(onDB);
 };
-exports.getScore = function(text, delay, ignoreMission){
+
+exports.useItem = function(client, id){
+    let my = this;
+    if (id < 0 || id > 5) return; // 없는 아이템
+    if (my.game.late) return;
+    let mgt = my.game.seq[my.game.turn];
+    let uid = mgt.robot ? mgt.id : mgt;
+    let firstMove = my.game.chain.length < 1;
+    let isTurnEnd = true;
+    let denied = false;
+
+    if (!mgt) return;
+    if (uid != client.id) return;
+    if (my.game.ilock) return client.publish('turnError', {code: 420}, true); // 아이템 연속사용
+    if (firstMove) return client.publish('turnError', {code: 421}, true); // 첫 턴
+    if (my.game.used[uid] >= 5 || my.game.item[uid][id] >= 2) return client.publish('turnError', {code: 429}, true); // 횟수 초과
+
+    switch (id) {
+        case 0: // 넘기기 - 다음 사람으로 턴으로 넘김
+            break;
+        case 1: // 건너뛰기 - 다음 사람의 턴을 넘김
+            my.game.queue = 1;
+            break;
+        case 2: // 뒤로 - 턴 순서를 반대로 만듦
+            my.game.rev = !my.game.rev;
+            break;
+        case 3: // 제시어 변경 - 랜덤 제시어로 변경 (단, 쿵쿵따는 가운데 글자로 바꿈)
+            isTurnEnd = true;
+            let newChar;
+            if (GAME_TYPE[my.mode] == 'KKT') {
+                // 쿵쿵따 전용처리
+                let chainlen = my.game.chain.length;
+                if (!chainlen) {
+                    denied = true;
+                    break;
+                }
+                let lastword = my.game.chain[chainlen - 1];
+                newChar = lastword.charAt(lastword.length - 2); // 3글자면 2번째, 2글자면 1번째 글자로 제시어 변경
+
+                let count = getWordList.call(my, newChar, getSubChar.call(my, newChar), true).length;
+                if (count < 5) denied = true;
+            } else {
+                newChar = getRandomChar.call(this);
+            }
+            if (!newChar) denied = true;
+
+            if (!denied) {
+                my.game.char = newChar;
+                my.game.subChar = getSubChar.call(my, newChar)
+                my.game.queue = -1;
+            }
+            break;
+        case 4: // 한번 더 - 단어를 한번 더 입력함
+            isTurnEnd = false;
+            my.game.queue = -1;
+            break;
+        case 5: // 무작위 - 무작위 글자를 넘겨줍니다. 쿵쿵따에서는 가운데 글자로 넘겨줍니다.
+            isTurnEnd = false;
+            my.game.random = true;
+    }
+    if (denied) {
+        return client.publish('turnError', {code: 420}, true);
+    }
+    my.game.used[uid]++;
+    my.game.item[uid][id]++;
+    my.game.ilock = true;
+    client.publish('useItem', {
+        item: id,
+        isEnd: isTurnEnd
+    }, true);
+    // 아이템 사용으로 턴이 종료됨 or 턴을 다시 시작해야함
+    if (isTurnEnd) {
+        my.game.late = true;
+        setTimeout(runAs, my.game.turnTime / 6, my, my.turnNext);
+    }
+};
+
+exports.getScore = function(text, delay, ignoreMission, returnNuff){
 	var my = this;
 	var tr = 1 - delay / my.game.turnTime;
 	var score, arr;
@@ -329,6 +463,8 @@ exports.getScore = function(text, delay, ignoreMission){
 		score += score * 0.5 * arr.length;
 		my.game.mission = true;
 	}
+
+	if(returnNuff) score = 0;
 	return Math.round(score);
 };
 exports.readyRobot = function(robot){
@@ -366,9 +502,12 @@ exports.readyRobot = function(robot){
 			}
 		}else denied();
 	});
-	function denied(){
-		text = isRev ? `T.T ...${my.game.char}` : `${my.game.char}... T.T`;
+	function denied() {
+
+		text = isRev ? `T.T...${my.game.char}` : `${my.game.char}...T.T`;
 		after();
+
+		setTimeout(function(){text = getRandomWord(1); after();}, 3000);
 	}
 	function pickList(list){
 		if(list) do{
@@ -439,6 +578,9 @@ function getAuto(char, subc, type){
 		case 'KSH':
 			adv = `^(${adc}).`;
 			break;
+		case 'KJH':
+			adv = `.*`;
+			break;
 		case 'ESH':
 			adv = `^(${adc})...`;
 			break;
@@ -452,7 +594,7 @@ function getAuto(char, subc, type){
 	if(!char){
 		console.log(`Undefined char detected! key=${key} type=${type} adc=${adc}`);
 	}
-	MAN.findOne([ '_id', char || "��" ]).on(function($mn){
+	MAN.findOne([ '_id', char || "★" ]).on(function($mn){
 		if($mn && bool){
 			if($mn[key] === null) produce();
 			else R.go($mn[key]);
@@ -461,10 +603,10 @@ function getAuto(char, subc, type){
 		}
 	});
 	function produce(){
-		var aqs = [[ '_id', new RegExp(adv) ]];
 		var aft;
 		var lst;
 		
+		var aqs = [[ '_id', new RegExp(adv) ]];
 		if(!my.opts.injeong) aqs.push([ 'flag', { '$nand': Const.KOR_FLAG.INJEONG } ]);
 		if(my.rule.lang == "ko"){
 			if(my.opts.loanword) aqs.push([ 'flag', { '$nand': Const.KOR_FLAG.LOANWORD } ]);
@@ -473,6 +615,7 @@ function getAuto(char, subc, type){
 		}else{
 			aqs.push([ '_id', Const.ENG_ID ]);
 		}
+
 		switch(type){
 			case 0:
 			default:
@@ -532,6 +675,7 @@ function getChar(text){
 		case 'ESH':
 		case 'KKT':
 		case 'KSH': return text.slice(-1);
+		case 'KJH': return text.slice(-1);
 		case 'KAP': return text.charAt(0);
 	}
 };
@@ -546,7 +690,7 @@ function getSubChar(char){
 		case "EKT":
 			if(char.length > 2) r = char.slice(1);
 			break;
-		case "KKT": case "KSH": case "KAP":
+		case "KKT": case "KSH": case "KAP": case "KJH":
 			k = c - 0xAC00;
 			if(k < 0 || k > 11171) break;
 			ca = [ Math.floor(k/28/21), Math.floor(k/28)%21, k%28 ];
