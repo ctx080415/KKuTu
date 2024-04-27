@@ -1052,8 +1052,9 @@ function normalGameUserBar(o){
 			.append(getLevelImage(o.data.score).addClass("game-user-level"))
 			.append($bar = $("<div>").addClass("game-user-name ellipse").html(getDisplayName(o)))
 			.append($("<div>").addClass("expl").html(L['LEVEL'] + " " + getLevel(o.data.score)))
-		)
-		.append($n = $("<div>").addClass("game-user-score"));
+		).append($n = $("<div>").addClass("game-user-score")).on('click', function(e){
+			requestProfile($(e.currentTarget).attr('id').slice(10));
+		});
 	renderMoremi($m, o.equip);
 	global.expl($R);
 	addonNickname($bar, o);
@@ -1067,8 +1068,9 @@ function miniGameUserBar(o){
 		.append($("<div>").addClass("game-user-title")
 			.append(getLevelImage(o.data.score).addClass("game-user-level"))
 			.append($bar = $("<div>").addClass("game-user-name ellipse").html(getDisplayName(o)))
-		)
-		.append($n = $("<div>").addClass("game-user-score"));
+		).append($n = $("<div>").addClass("game-user-score")).on('click', function(e){
+			requestProfile($(e.currentTarget).attr('id').slice(10));
+		});
 	if(o.id == $data.id) $bar.addClass("game-user-my-name");
 	addonNickname($bar, o);
 	if(o.game.team) $n.addClass("team-" + o.game.team);
@@ -1473,10 +1475,7 @@ function drawLeaderboard(data){
 	var page = (data.page || Math.floor(fr / 20)) + 1;
 	
 	data.data.forEach(function(item, index){
-		var profile = $data.users[item.id];
-		
-		if(profile) profile = profile.profile.title || profile.profile.name;
-		else profile = L['hidden'];
+		profile = item.nickname || L['hidden'];
 		
 		item.score = Number(item.score);
 		$board.append($("<tr>").attr('id', "ranking-" + item.id)
@@ -1618,6 +1617,7 @@ function requestProfile(id){
 	$data._profiled = id;
 	$stage.dialog.profileKick.hide();
 	$stage.dialog.profileShut.hide();
+	$stage.dialog.profileFriend.hide();
 	$stage.dialog.profileDress.hide();
 	$stage.dialog.profileWhisper.hide();
 	$stage.dialog.profileHandover.hide();
@@ -1626,6 +1626,7 @@ function requestProfile(id){
 	else if(!o.robot){
 		$stage.dialog.profileShut.show();
 		$stage.dialog.profileWhisper.show();
+		$stage.dialog.profileFriend.show();
 	}
 	if($data.room){
 		if($data.id != id && $data.id == $data.room.master){

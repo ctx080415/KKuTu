@@ -51,11 +51,13 @@ html
 	body(style='min-width: 640px;')
 		div#Top
 			+Menu()
-			div#global-notice
-				div#gn-content
-					include ../public/global_notice.html
-				+Expl(L('GLOBAL_NOTICE'))
 			block Top
+		
+		div#global-notice
+			div#gn-content
+				include ../public/global_notice.html
+			+Expl(L('GLOBAL_NOTICE'))
+			
 		div#Jungle
 			span#mobile= locals.mobile
 			span#summonerID= DATA._id
