@@ -54,14 +54,37 @@ equ{
 	background-color: rgba(0, 0, 0, 0.5);
 	z-index: 5;
 }
-#Top{
-	background-color: #7CC4F8;
-	background-image: none;
+
+
+@media (min-width: 768px){
+	.Menu-Container {
+		width: 750px;
+	}
+}
+@media (min-width: 992px){
+	.Menu-Container {
+		width: 970px;
+	}
+}
+@media (min-width: 1200px){
+	.Menu-Container {
+		width: 1170px;
+	}
+}
+.Menu-Container{
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 15px;
+    padding-right: 15px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 #Top .menu-btn{
-	color: #111111;
-	background-color: #7CC4F8;
-	background-image: none;
+	color: #ffffff;
+    background-color: #7cc4f800;
+    background-image: none;
 }
 #Top .menu-sub-btn{ color: #222222; }
 #Bottom .bottom-text{ display: none; }

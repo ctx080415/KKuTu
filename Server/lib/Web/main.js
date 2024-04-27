@@ -55,7 +55,7 @@ var page = WebInit.page;
 var gameServers = [];
 
 WebInit.MOBILE_AVAILABLE = [
-	"portal", "main", "kkutu"
+	"main", "kkutu"
 ];
 
 require("../sub/checkpub");
@@ -251,7 +251,7 @@ Server.get("/", function(req, res){
 			'IJP_EXCEPT': Const.IJP_EXCEPT,
 			'ogImage': "http://kkutu.kr/img/kkutu/logo.png",
 			'ogURL': "http://kkutu.kr/",
-			'ogTitle': "글자로 놀자! 끄투 온라인",
+			'ogTitle': "세상 모든 단어! 월드끄투",
 			'ogDescription': "끝말잇기가 이렇게 박진감 넘치는 게임이었다니!"
 		});
 	}

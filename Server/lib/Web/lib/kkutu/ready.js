@@ -106,6 +106,7 @@ $(document).ready(function(){
 				profileKick: $("#profile-kick"),
 				profileLevel: $("#profile-level"),
 				profileDress: $("#profile-dress"),
+				profileFriend: $("#profile-friend"),
 				profileWhisper: $("#profile-whisper"),
 			kickVote: $("#KickVoteDiag"),
 				kickVoteY: $("#kick-vote-yes"),
@@ -303,6 +304,19 @@ $(document).ready(function(){
 		}
 		$stage.game.hereText.val("");
 	}).hotkey($stage.talk, 13).hotkey($stage.game.hereText, 13);
+
+
+	$(document).keydown(function(e) {
+		if(e.keyCode == 13){
+			if(!$("#Talk").is(":focus") && !$("#dict-input").is(":focus")) {
+				$("#Talk").focus();
+			}
+		}
+		else if (e.keyCode === 27) {
+			$("#Talk").blur();
+		}
+	});
+
 	$("#cw-q-input").on('keydown', function(e){
 		if(e.keyCode == 13){
 			var $target = $(e.currentTarget);
@@ -787,6 +801,14 @@ $(document).ready(function(){
 			$data.box = res;
 			drawMyDress();
 		});
+	});
+	$stage.dialog.profileFriend.on('click', function(e){
+		var id = $data._profiled;
+
+		if(!id) return;
+		if(!$data.users[id]) return fail(450);
+
+		send('friendAdd', { target: id }, true);
 	});
 	$stage.dialog.dressOK.on('click', function(e){
 		const data = {};
