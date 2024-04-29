@@ -9,6 +9,7 @@
 - Languages
 	* [한국어](#한국어)
 	* [English](#english)
+- 본 프로젝트는 PrjKKuTu의 KKuTu를 일부 포함하고 있습니다.
 
 ## 한국어
 > 글자로 놀자! 끄투 온라인
